@@ -1,6 +1,6 @@
 ---
-- name: Configurar banco de dados PostgreSQL
-  hosts: db
+- name: Carregar schema e seeds no RDS (via EC2 da API)
+  hosts: api
   become: true
   roles:
     - db

@@ -3,20 +3,26 @@
 # Variáveis globais — Dating App
 # ============================================================
 
-# Banco de dados
+# Banco de dados (RDS)
 db_name:     dating_app
 db_user:     dating_user
 db_password: dating_pass_2024
-db_host:     ec2-db      # hostname do container Docker (resolúvel na rede dating-net)
-db_port:     5432
-pg_version:  "14"        # versão do PostgreSQL no Ubuntu 22.04
+db_dialect:  postgres
+
+# Endpoint RDS — preenchido pelo Makefile via `terraform output` após tf-apply
+# Valores padrão abaixo servem apenas como fallback
+rds_host: "localstack"   # hostname do container LocalStack na rede Docker
+rds_port: "4510"          # porta padrão LocalStack RDS; sobrescrito pelo Makefile
+
+# db_host e db_port são usados pelo env.j2 para gerar o .env da API
+db_host: "{{ rds_host }}"
+db_port: "{{ rds_port }}"
 
 # API Node.js
-api_port:    3000
-api_dir:     /opt/dating-api
+api_port:     3000
+api_dir:      /opt/dating-api
 pm2_app_name: dating-api
 node_version: "20"
 
 # Caminho para o código-fonte da API no controlador Ansible
-# playbook_dir aponta para localstack/ansible/ → ../../ volta para a raiz do workspace
 api_source_dir: "{{ playbook_dir }}/../../APIs para exercícios/api-js"

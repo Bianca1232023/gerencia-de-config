@@ -45,14 +45,14 @@ setup-keys:
 # Docker
 # ============================================================
 up: setup-keys
-	@echo "--- Subindo containers (LocalStack + EC2 simulados) ---"
+	@echo "--- Subindo containers (LocalStack + EC2 simulada) ---"
 	docker-compose up -d --build
 	@echo "--- Aguardando LocalStack ficar disponível (até 60s) ---"
 	@timeout 60 bash -c \
 		'until curl -sf http://localhost:4566/_localstack/health | grep -q "available" 2>/dev/null; \
 		 do echo "  aguardando LocalStack..."; sleep 5; done' \
 	  || echo "Aviso: LocalStack pode não ter inicializado completamente."
-	@echo "--- Aguardando SSH dos containers ficarem prontos (10s) ---"
+	@echo "--- Aguardando SSH do container ficar pronto (10s) ---"
 	@sleep 10
 	@echo "Containers prontos."
 
@@ -90,20 +90,34 @@ tf-output:
 # Ansible
 # ============================================================
 ansible-ping:
-	@echo "--- Testando conectividade SSH com os containers ---"
+	@echo "--- Testando conectividade SSH com o container ec2-api ---"
 	cd ansible && ansible all -i inventory/hosts.ini -m ping
 
 ansible-db:
-	@echo "--- Configurando banco de dados (PostgreSQL + schema + seeds) ---"
-	cd ansible && ansible-playbook -i inventory/hosts.ini playbook-db.yml
+	@echo "--- Obtendo endpoint RDS do Terraform ---"
+	$(eval RDS_PORT := $(shell cd terraform && terraform output -raw rds_port 2>/dev/null || echo "4510"))
+	$(eval RDS_HOST := $(shell cd terraform && terraform output -raw rds_endpoint 2>/dev/null || echo "localstack"))
+	@echo "  RDS Host: $(RDS_HOST)  |  RDS Port: $(RDS_PORT)"
+	@echo "--- Carregando schema e seeds no RDS (via ec2-api) ---"
+	cd ansible && ansible-playbook -i inventory/hosts.ini playbook-db.yml \
+	  --extra-vars "rds_host=$(RDS_HOST) rds_port=$(RDS_PORT) db_host=$(RDS_HOST) db_port=$(RDS_PORT)"
 
 ansible-api:
+	@echo "--- Obtendo endpoint RDS do Terraform ---"
+	$(eval RDS_PORT := $(shell cd terraform && terraform output -raw rds_port 2>/dev/null || echo "4510"))
+	$(eval RDS_HOST := $(shell cd terraform && terraform output -raw rds_endpoint 2>/dev/null || echo "localstack"))
+	@echo "  RDS Host: $(RDS_HOST)  |  RDS Port: $(RDS_PORT)"
 	@echo "--- Fazendo deploy da API Node.js ---"
-	cd ansible && ansible-playbook -i inventory/hosts.ini playbook-api.yml
+	cd ansible && ansible-playbook -i inventory/hosts.ini playbook-api.yml \
+	  --extra-vars "rds_host=$(RDS_HOST) rds_port=$(RDS_PORT) db_host=$(RDS_HOST) db_port=$(RDS_PORT)"
 
 ansible-all:
 	@echo "--- Executando todos os playbooks Ansible ---"
-	cd ansible && ansible-playbook -i inventory/hosts.ini site.yml
+	$(eval RDS_PORT := $(shell cd terraform && terraform output -raw rds_port 2>/dev/null || echo "4510"))
+	$(eval RDS_HOST := $(shell cd terraform && terraform output -raw rds_endpoint 2>/dev/null || echo "localstack"))
+	@echo "  RDS Host: $(RDS_HOST)  |  RDS Port: $(RDS_PORT)"
+	cd ansible && ansible-playbook -i inventory/hosts.ini site.yml \
+	  --extra-vars "rds_host=$(RDS_HOST) rds_port=$(RDS_PORT) db_host=$(RDS_HOST) db_port=$(RDS_PORT)"
 
 # ============================================================
 # Limpeza completa

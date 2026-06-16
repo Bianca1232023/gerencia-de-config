@@ -23,14 +23,19 @@ output "api_public_ip" {
   value       = aws_instance.api.public_ip
 }
 
-output "db_instance_id" {
-  description = "ID da instância EC2 do banco de dados"
-  value       = aws_instance.db.id
+output "rds_endpoint" {
+  description = "Endereço do RDS PostgreSQL (sem porta)"
+  value       = aws_db_instance.postgres.address
 }
 
-output "db_private_ip" {
-  description = "IP privado da EC2 do banco de dados"
-  value       = aws_instance.db.private_ip
+output "rds_port" {
+  description = "Porta do RDS PostgreSQL"
+  value       = aws_db_instance.postgres.port
+}
+
+output "rds_db_name" {
+  description = "Nome do banco de dados RDS"
+  value       = aws_db_instance.postgres.db_name
 }
 
 output "api_gateway_id" {

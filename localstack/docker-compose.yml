@@ -6,8 +6,9 @@ services:
     container_name: localstack
     ports:
       - "4566:4566"
+      - "4510-4559:4510-4559"   # portas internas das instâncias RDS
     environment:
-      SERVICES: ec2,apigateway,iam,logs,sts
+      SERVICES: ec2,rds,apigateway,iam,logs,sts
       DEFAULT_REGION: us-east-1
       DEBUG: "1"
       DOCKER_HOST: unix:///var/run/docker.sock
@@ -33,22 +34,8 @@ services:
     ports:
       - "2222:22"    # SSH para Ansible
       - "3000:3000"  # API Node.js
-    networks:
-      - dating-net
-    depends_on:
-      localstack:
-        condition: service_healthy
-
-  # Simula a EC2 do banco de dados (container Ubuntu com SSH)
-  ec2-db:
-    build:
-      context: ./docker
-      dockerfile: Dockerfile.ec2
-    container_name: ec2-db
-    hostname: ec2-db
-    ports:
-      - "2223:22"    # SSH para Ansible
-      - "5432:5432"  # PostgreSQL
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - dating-net
     depends_on:

@@ -42,7 +42,7 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Subnet privada — banco de dados
+# Subnet privada — banco de dados (AZ a)
 resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_subnet_cidr
@@ -50,6 +50,19 @@ resource "aws_subnet" "private" {
 
   tags = {
     Name    = "dating-app-private-subnet"
+    Project = "dating-app"
+    Tier    = "private"
+  }
+}
+
+# Segunda subnet privada — necessária para o DB Subnet Group do RDS (AZ b)
+resource "aws_subnet" "private2" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_subnet2_cidr
+  availability_zone = "${var.region}b"
+
+  tags = {
+    Name    = "dating-app-private-subnet-2"
     Project = "dating-app"
     Tier    = "private"
   }
@@ -117,10 +130,10 @@ resource "aws_security_group" "api" {
   }
 }
 
-# SG do banco de dados — acesso restrito à API
+# SG do banco de dados (RDS) — acesso restrito à API
 resource "aws_security_group" "db" {
   name        = "dating-app-db-sg"
-  description = "Security Group do PostgreSQL"
+  description = "Security Group do RDS PostgreSQL"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -131,12 +144,13 @@ resource "aws_security_group" "db" {
     description     = "PostgreSQL — acesso exclusivo da API"
   }
 
+  # Range de portas usado pelo LocalStack para instâncias RDS internas
   ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "SSH interno (Ansible)"
+    from_port       = 4510
+    to_port         = 4560
+    protocol        = "tcp"
+    security_groups = [aws_security_group.api.id]
+    description     = "LocalStack RDS — portas internas"
   }
 
   egress {

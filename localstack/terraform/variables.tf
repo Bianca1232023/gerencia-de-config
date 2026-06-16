@@ -22,6 +22,12 @@ variable "private_subnet_cidr" {
   default     = "10.0.2.0/24"
 }
 
+variable "private_subnet2_cidr" {
+  description = "CIDR block da segunda subnet privada (RDS subnet group — AZ b)"
+  type        = string
+  default     = "10.0.3.0/24"
+}
+
 variable "ami_id" {
   description = "ID da AMI para as instâncias EC2 (LocalStack aceita qualquer valor)"
   type        = string
