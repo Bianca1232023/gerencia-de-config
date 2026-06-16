@@ -1,0 +1,88 @@
+---
+# ============================================================
+# Instalar PostgreSQL
+# ============================================================
+- name: Instalar PostgreSQL e dependências Python
+  apt:
+    name:
+      - postgresql
+      - postgresql-contrib
+      - python3-psycopg2
+      - acl
+    state: present
+    update_cache: true
+
+- name: Iniciar e habilitar serviço PostgreSQL
+  systemd:
+    name: postgresql
+    state: started
+    enabled: true
+
+# ============================================================
+# Criar usuário e banco de dados
+# ============================================================
+- name: Criar usuário do banco de dados
+  become_user: postgres
+  postgresql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    role_attr_flags: CREATEDB,NOSUPERUSER
+    state: present
+
+- name: Criar banco de dados
+  become_user: postgres
+  postgresql_db:
+    name: "{{ db_name }}"
+    owner: "{{ db_user }}"
+    state: present
+
+# ============================================================
+# Criar schema (DDL)
+# ============================================================
+- name: Copiar schema SQL para o servidor
+  copy:
+    src: schema.sql
+    dest: /tmp/schema.sql
+    mode: '0644'
+
+- name: Executar schema SQL
+  become_user: postgres
+  shell: psql -d {{ db_name }} -f /tmp/schema.sql
+  args:
+    executable: /bin/bash
+
+# ============================================================
+# Inserir seeds
+# ============================================================
+- name: Copiar seeds SQL para o servidor
+  copy:
+    src: seeds.sql
+    dest: /tmp/seeds.sql
+    mode: '0644'
+
+- name: Executar seeds SQL
+  become_user: postgres
+  shell: psql -d {{ db_name }} -f /tmp/seeds.sql
+  args:
+    executable: /bin/bash
+
+# ============================================================
+# Configurar acesso remoto ao PostgreSQL
+# ============================================================
+- name: Permitir conexões remotas no pg_hba.conf
+  lineinfile:
+    path: /etc/postgresql/{{ pg_version }}/main/pg_hba.conf
+    line: "host    {{ db_name }}    {{ db_user }}    0.0.0.0/0    md5"
+    state: present
+  notify: Reiniciar PostgreSQL
+
+- name: Configurar PostgreSQL para escutar em todas as interfaces
+  lineinfile:
+    path: /etc/postgresql/{{ pg_version }}/main/postgresql.conf
+    regexp: "^#?listen_addresses"
+    line: "listen_addresses = '*'"
+    state: present
+  notify: Reiniciar PostgreSQL
+
+- name: Forçar execução dos handlers antes de continuar
+  meta: flush_handlers

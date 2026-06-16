@@ -1,0 +1,6 @@
+---
+- name: Configurar banco de dados PostgreSQL
+  hosts: db
+  become: true
+  roles:
+    - db

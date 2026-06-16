@@ -1,0 +1,146 @@
+---
+# ============================================================
+# Instalar Node.js v20
+# ============================================================
+- name: Baixar script de configuração do NodeSource
+  get_url:
+    url: "https://deb.nodesource.com/setup_{{ node_version }}.x"
+    dest: /tmp/nodesource_setup.sh
+    mode: '0755'
+
+- name: Executar script de configuração do NodeSource
+  shell: bash /tmp/nodesource_setup.sh
+  args:
+    executable: /bin/bash
+
+- name: Instalar Node.js
+  apt:
+    name: nodejs
+    state: present
+    update_cache: true
+
+- name: Verificar versão do Node.js instalado
+  shell: node --version
+  register: node_ver
+  changed_when: false
+
+- name: Exibir versão do Node.js
+  debug:
+    msg: "Node.js instalado: {{ node_ver.stdout }}"
+
+# ============================================================
+# Instalar PM2 (gerenciador de processos)
+# ============================================================
+- name: Instalar PM2 globalmente via npm
+  npm:
+    name: pm2
+    global: true
+    state: present
+
+# ============================================================
+# Preparar diretório da aplicação
+# ============================================================
+- name: Criar diretório {{ api_dir }}
+  file:
+    path: "{{ api_dir }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+
+# ============================================================
+# Copiar código-fonte da API
+# ============================================================
+- name: Copiar código-fonte da API para o servidor
+  copy:
+    src: "{{ api_source_dir }}/"
+    dest: "{{ api_dir }}/"
+    owner: ubuntu
+    group: ubuntu
+    directory_mode: '0755'
+
+- name: Garantir permissões corretas nos arquivos JS
+  shell: find {{ api_dir }} -type f -name "*.js" -exec chmod 644 {} \;
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+# ============================================================
+# Configurar variáveis de ambiente (.env)
+# ============================================================
+- name: Criar arquivo .env a partir do template
+  template:
+    src: env.j2
+    dest: "{{ api_dir }}/.env"
+    owner: ubuntu
+    group: ubuntu
+    mode: '0600'
+
+# ============================================================
+# Instalar dependências npm
+# ============================================================
+- name: Instalar dependências npm
+  npm:
+    path: "{{ api_dir }}"
+    state: present
+  become_user: ubuntu
+
+# ============================================================
+# Iniciar API com PM2
+# ============================================================
+- name: Parar instância anterior da API no PM2 (se existir)
+  shell: pm2 stop {{ pm2_app_name }} 2>/dev/null || true
+  become_user: ubuntu
+  changed_when: false
+
+- name: Remover instância anterior da API no PM2 (se existir)
+  shell: pm2 delete {{ pm2_app_name }} 2>/dev/null || true
+  become_user: ubuntu
+  changed_when: false
+
+- name: Iniciar API com PM2
+  shell: |
+    cd {{ api_dir }} && pm2 start index.js --name {{ pm2_app_name }}
+  become_user: ubuntu
+  args:
+    executable: /bin/bash
+
+- name: Salvar lista de processos do PM2
+  shell: pm2 save
+  become_user: ubuntu
+  changed_when: false
+
+# ============================================================
+# Configurar PM2 no startup do sistema
+# ============================================================
+- name: Gerar comando de startup do PM2
+  shell: pm2 startup systemd -u ubuntu --hp /home/ubuntu
+  register: pm2_startup
+  changed_when: false
+
+- name: Executar comando de startup do PM2
+  shell: "{{ pm2_startup.stdout_lines | select('match', '^sudo') | list | first }}"
+  when: pm2_startup.stdout is search('sudo')
+  ignore_errors: true
+
+# ============================================================
+# Verificar se a API está respondendo
+# ============================================================
+- name: Aguardar API ficar disponível na porta {{ api_port }}
+  wait_for:
+    host: 127.0.0.1
+    port: "{{ api_port }}"
+    delay: 5
+    timeout: 60
+
+- name: Verificar status HTTP da API
+  uri:
+    url: "http://127.0.0.1:{{ api_port }}/usuarios"
+    method: GET
+    status_code: [200, 404, 500]
+  register: api_check
+  ignore_errors: true
+
+- name: Exibir resultado da verificação
+  debug:
+    msg: "API respondeu com status HTTP {{ api_check.status | default('sem resposta') }}"

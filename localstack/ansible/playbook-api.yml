@@ -1,0 +1,6 @@
+---
+- name: Fazer deploy da API Node.js
+  hosts: api
+  become: true
+  roles:
+    - api

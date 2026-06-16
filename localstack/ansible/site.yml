@@ -1,0 +1,4 @@
+---
+# Playbook principal — executa banco de dados e API em sequência
+- import_playbook: playbook-db.yml
+- import_playbook: playbook-api.yml
